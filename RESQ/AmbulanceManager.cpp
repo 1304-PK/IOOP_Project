@@ -1,12 +1,9 @@
-// ============================================================
-//  AmbulanceManager.cpp  –  Ten-ambulance fleet management
-//  Included by main.cpp (unity build).  Do NOT compile alone.
-// ============================================================
+// ambulance fleet management
 
 static const string AMB_FILE = "data/ambulances.txt";
 static const int    HOSPITAL_CITY_ID = 0;
 
-// ==================== Ambulance ==============================
+// ambulance
 
 enum class AmbulanceStatus { AVAILABLE, DISPATCHED };
 
@@ -23,17 +20,17 @@ class Ambulance {
     AmbulanceStatus status;
     int             currentCityId;
     string          assignedEmergencyId;
-    string          capabilities;   // e.g., "ALS" (advanced life support)
+    string          capabilities;   // advanced life support capabilities
 
 public:
     Ambulance() : status(AmbulanceStatus::AVAILABLE),
                   currentCityId(HOSPITAL_CITY_ID) {}
 
-    Ambulance(string id, AmbulanceStatus status, int cityId,
-              string assignedEmergId, string caps)
-        : id(std::move(id)), status(status), currentCityId(cityId),
-          assignedEmergencyId(std::move(assignedEmergId)),
-          capabilities(std::move(caps)) {}
+    Ambulance(const string& id, AmbulanceStatus status, int cityId,
+              const string& assignedEmergId, const string& caps)
+        : id(id), status(status), currentCityId(cityId),
+          assignedEmergencyId(assignedEmergId),
+          capabilities(caps) {}
 
     const string& getId()                  const { return id; }
     AmbulanceStatus getStatus()            const { return status; }
@@ -63,15 +60,15 @@ public:
     }
 };
 
-// ==================== AmbulanceManager =======================
+// ambulance manager
 
 class AmbulanceManager {
-    map<string, Ambulance> fleet;  // id -> Ambulance
+    map<string, Ambulance> fleet;  // id -> ambulance
 
 public:
     AmbulanceManager() {}
 
-    // ---- Load from file -------------------------------------
+    // load from file
     void load() {
         ensureFile(AMB_FILE);
         fleet.clear();
@@ -87,7 +84,7 @@ public:
         }
     }
 
-    // ---- Save to file ---------------------------------------
+    // save to file
     void save() const {
         vector<string> lines;
         for (const auto& pair : fleet)
@@ -95,7 +92,7 @@ public:
         writeLines(AMB_FILE, lines);
     }
 
-    // ---- Initialize ten ambulances (first run) --------------
+    // initialize fleet on first run
     void initFleet() {
         if (!fleet.empty()) return;
         for (int i = 1; i <= 10; ++i) {
@@ -108,14 +105,14 @@ public:
         save();
     }
 
-    // ---- Get first available ambulance ----------------------
+    // get first available ambulance
     Ambulance* getAvailable() {
         for (auto& pair : fleet)
             if (pair.second.isAvailable()) return &pair.second;
         return nullptr;
     }
 
-    // ---- Dispatch ambulance ---------------------------------
+    // dispatch ambulance
     bool dispatch(const string& ambId, const string& emergId, int destCityId) {
         auto it = fleet.find(ambId);
         if (it == fleet.end() || !it->second.isAvailable()) return false;
@@ -124,7 +121,7 @@ public:
         return true;
     }
 
-    // ---- Complete mission: return ambulance -----------------
+    // complete mission and return ambulance
     bool completeMission(const string& ambId) {
         auto it = fleet.find(ambId);
         if (it == fleet.end()) return false;
@@ -133,7 +130,7 @@ public:
         return true;
     }
 
-    // ---- Counts --------------------------------------------
+    // counts
     int countAvailable() const {
         int n = 0;
         for (const auto& pair : fleet) if (pair.second.isAvailable()) ++n;
@@ -148,7 +145,7 @@ public:
         return (it != fleet.end()) ? &it->second : nullptr;
     }
 
-    // ---- Display --------------------------------------------
+    // display
     void display(const Graph& g) const {
         cout << "\n";
         cout << left

@@ -1,24 +1,21 @@
-// ============================================================
-//  Graph.cpp  –  City road network and Dijkstra routing
-//  Included by main.cpp (unity build).  Do NOT compile alone.
-// ============================================================
+// city road network and dijkstra routing
 
-// --------------- City ----------------------------------------
+// city
 struct City {
     int    id;
     string name;
 };
 
-// --------------- Edge ----------------------------------------
+// edge
 struct Edge {
     int to;       // destination city id
     int weight;   // distance in km
 };
 
-// --------------- Graph ---------------------------------------
+// graph
 class Graph {
 public:
-    unordered_map<int, City>          cities;      // id -> City
+    unordered_map<int, City>          cities;      // id -> city
     unordered_map<int, vector<Edge>>  adj;         // adjacency list
 
     void addCity(int id, const string& name) {
@@ -37,11 +34,11 @@ public:
     }
 
     string cityName(int id) const {
-        unordered_map<int,City>::const_iterator it = cities.find(id);
+        auto it = cities.find(id);
         return (it != cities.end()) ? it->second.name : "Unknown";
     }
 
-    // Dijkstra — returns dist[] and pred[]
+    // dijkstra - returns dist and pred
     pair<unordered_map<int,int>, unordered_map<int,int>>
     dijkstra(int src) const {
         typedef pair<int,int> pii;
@@ -50,10 +47,9 @@ public:
         unordered_map<int,int> dist;
         unordered_map<int,int> pred;
 
-        for (unordered_map<int,City>::const_iterator it = cities.begin();
-             it != cities.end(); ++it) {
-            dist[it->first] = INT_MAX;
-            pred[it->first] = -1;
+        for (const auto& p : cities) {
+            dist[p.first] = INT_MAX;
+            pred[p.first] = -1;
         }
         dist[src] = 0;
         pq.push(make_pair(0, src));
@@ -64,12 +60,12 @@ public:
             pq.pop();
             if (d > dist[u]) continue;
 
-            unordered_map<int,vector<Edge>>::const_iterator eit = adj.find(u);
+            auto eit = adj.find(u);
             if (eit == adj.end()) continue;
 
-            for (size_t i = 0; i < eit->second.size(); ++i) {
-                int v  = eit->second[i].to;
-                int nd = dist[u] + eit->second[i].weight;
+            for (const auto& edge : eit->second) {
+                int v  = edge.to;
+                int nd = dist[u] + edge.weight;
                 if (nd < dist[v]) {
                     dist[v] = nd;
                     pred[v] = u;
@@ -117,19 +113,17 @@ public:
         cout << left << setw(6) << "ID"
              << setw(30) << "City Name" << "\n";
         cout << string(36, '-') << "\n";
-        for (unordered_map<int,City>::const_iterator it = cities.begin();
-             it != cities.end(); ++it)
-            cout << left << setw(6)  << it->first
-                 << setw(30) << it->second.name << "\n";
+        for (const auto& p : cities)
+            cout << left << setw(6)  << p.first
+                 << setw(30) << p.second.name << "\n";
     }
 
     void displayRoads() const {
-        for (unordered_map<int,vector<Edge>>::const_iterator it = adj.begin();
-             it != adj.end(); ++it) {
-            cout << "  " << cityName(it->first) << ":\n";
-            for (size_t i = 0; i < it->second.size(); ++i)
-                cout << "      -> " << setw(26) << cityName(it->second[i].to)
-                     << it->second[i].weight << " km\n";
+        for (const auto& p : adj) {
+            cout << "  " << cityName(p.first) << ":\n";
+            for (const auto& edge : p.second)
+                cout << "      -> " << setw(26) << cityName(edge.to)
+                     << edge.weight << " km\n";
         }
     }
 

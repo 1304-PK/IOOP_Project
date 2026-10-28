@@ -1,7 +1,4 @@
-// ============================================================
-//  AuthService.cpp  –  User classes + Authentication
-//  Included by main.cpp (unity build).  Do NOT compile alone.
-// ============================================================
+// user models and auth service
 
 enum class Role { PATIENT, DOCTOR, ADMIN };
 
@@ -16,7 +13,7 @@ static Role strToRole(const string& s) {
     return Role::PATIENT;
 }
 
-// ==================== User (base class) ======================
+// user base class
 class User {
 protected:
     string id;
@@ -53,7 +50,7 @@ public:
     }
 };
 
-// ==================== Patient ================================
+// patient class
 class Patient : public User {
     string phone;
     string address;
@@ -91,7 +88,7 @@ public:
     }
 };
 
-// ==================== Doctor =================================
+// doctor class
 enum class DoctorType { SPECIALIST, EMERGENCY_PHYSICIAN };
 
 static string doctorTypeToStr(DoctorType t) {
@@ -107,7 +104,7 @@ class Doctor : public User {
     DoctorType doctorType;
     bool       available;
     string     assignedEmergencyId;
-    map<string, string> bookedSlots;  // "date|time" -> apptId
+    map<string, string> bookedSlots;  // "date|time" -> appt id
 
 public:
     Doctor() : User(), doctorType(DoctorType::SPECIALIST), available(true) {}
@@ -142,10 +139,9 @@ public:
 
     string slotsToString() const {
         string s;
-        for (map<string,string>::const_iterator it = bookedSlots.begin();
-             it != bookedSlots.end(); ++it) {
+        for (const auto& p : bookedSlots) {
             if (!s.empty()) s += ";";
-            s += it->first + ":" + it->second;
+            s += p.first + ":" + p.second;
         }
         return s;
     }
@@ -179,13 +175,12 @@ public:
              << setw(10) << "Time"
              << setw(14) << "Appt ID" << "\n";
         cout << string(38, '-') << "\n";
-        for (map<string,string>::const_iterator it = bookedSlots.begin();
-             it != bookedSlots.end(); ++it) {
-            vector<string> parts = split(it->first);
-            string date = parts.size() > 0 ? parts[0] : it->first;
+        for (const auto& p : bookedSlots) {
+            vector<string> parts = split(p.first);
+            string date = parts.size() > 0 ? parts[0] : p.first;
             string time = parts.size() > 1 ? parts[1] : "";
             cout << setw(14) << date << setw(10) << time
-                 << setw(14) << it->second << "\n";
+                 << setw(14) << p.second << "\n";
         }
     }
 
@@ -200,7 +195,7 @@ public:
     }
 };
 
-// ==================== Admin ==================================
+// admin class
 class Admin : public User {
 public:
     Admin() : User() {}
@@ -213,7 +208,7 @@ public:
     }
 };
 
-// ==================== AuthService ============================
+// auth service
 static const string USERS_FILE = "data/users.txt";
 static const string DOCS_FILE  = "data/doctors.txt";
 
@@ -225,16 +220,15 @@ class AuthService {
 public:
     AuthService() {}
     ~AuthService() {
-        for (map<string,User*>::iterator it = usersById.begin();
-             it != usersById.end(); ++it)
-            delete it->second;
+        for (auto& p : usersById)
+            delete p.second;
     }
 
     void loadAll() {
         ensureFile(USERS_FILE);
         ensureFile(DOCS_FILE);
 
-        // Load patients and admins
+        // load patients and admins
         vector<string> lines = readLines(USERS_FILE);
         for (size_t i = 0; i < lines.size(); ++i) {
             vector<string> tok = split(lines[i]);
@@ -256,7 +250,7 @@ public:
             }
         }
 
-        // Load doctors
+        // load doctors
         vector<string> dlines = readLines(DOCS_FILE);
         for (size_t i = 0; i < dlines.size(); ++i) {
             vector<string> tok = split(dlines[i]);
@@ -278,12 +272,11 @@ public:
 
     void saveAll() {
         vector<string> userLines, doctorLines;
-        for (map<string,User*>::iterator it = usersById.begin();
-             it != usersById.end(); ++it) {
-            if (it->second->getRole() == Role::DOCTOR)
-                doctorLines.push_back(it->second->serialize());
+        for (const auto& p : usersById) {
+            if (p.second->getRole() == Role::DOCTOR)
+                doctorLines.push_back(p.second->serialize());
             else
-                userLines.push_back(it->second->serialize());
+                userLines.push_back(p.second->serialize());
         }
         writeLines(USERS_FILE, userLines);
         writeLines(DOCS_FILE, doctorLines);
@@ -310,9 +303,8 @@ public:
     }
 
     bool adminExists() const {
-        for (map<string,User*>::const_iterator it = usersById.begin();
-             it != usersById.end(); ++it)
-            if (it->second->getRole() == Role::ADMIN) return true;
+        for (const auto& p : usersById)
+            if (p.second->getRole() == Role::ADMIN) return true;
         return false;
     }
 
@@ -341,7 +333,7 @@ public:
     }
 
     User* login(const string& username, const string& password) {
-        map<string,string>::iterator it = usernameToId.find(username);
+        auto it = usernameToId.find(username);
         if (it == usernameToId.end()) return nullptr;
         User* u = usersById[it->second];
         if (!verifyPassword(password, u->getPasswordHash())) return nullptr;
@@ -349,15 +341,15 @@ public:
     }
 
     User* getUserById(const string& id) const {
-        map<string,User*>::const_iterator it = usersById.find(id);
+        auto it = usersById.find(id);
         return (it != usersById.end()) ? it->second : nullptr;
     }
     Doctor* getDoctorById(const string& id) const {
-        map<string,Doctor*>::const_iterator it = doctorsById.find(id);
+        auto it = doctorsById.find(id);
         return (it != doctorsById.end()) ? it->second : nullptr;
     }
     Patient* getPatientById(const string& id) const {
-        map<string,User*>::const_iterator it = usersById.find(id);
+        auto it = usersById.find(id);
         if (it == usersById.end() || it->second->getRole() != Role::PATIENT)
             return nullptr;
         return dynamic_cast<Patient*>(it->second);
@@ -365,46 +357,40 @@ public:
 
     vector<Doctor*> getDoctorsBySpecialization(const string& spec) const {
         vector<Doctor*> result;
-        for (map<string,Doctor*>::const_iterator it = doctorsById.begin();
-             it != doctorsById.end(); ++it)
-            if (it->second->getSpecialization() == spec &&
-                !it->second->isEmergencyPhysician())
-                result.push_back(it->second);
+        for (const auto& p : doctorsById)
+            if (p.second->getSpecialization() == spec &&
+                !p.second->isEmergencyPhysician())
+                result.push_back(p.second);
         return result;
     }
 
     vector<Doctor*> getEmergencyPhysicians() const {
         vector<Doctor*> result;
-        for (map<string,Doctor*>::const_iterator it = doctorsById.begin();
-             it != doctorsById.end(); ++it)
-            if (it->second->isEmergencyPhysician())
-                result.push_back(it->second);
+        for (const auto& p : doctorsById)
+            if (p.second->isEmergencyPhysician())
+                result.push_back(p.second);
         return result;
     }
 
     vector<Doctor*> getAllDoctors() const {
         vector<Doctor*> result;
-        for (map<string,Doctor*>::const_iterator it = doctorsById.begin();
-             it != doctorsById.end(); ++it)
-            result.push_back(it->second);
+        for (const auto& p : doctorsById)
+            result.push_back(p.second);
         return result;
     }
 
     vector<Patient*> getAllPatients() const {
         vector<Patient*> result;
-        for (map<string,User*>::const_iterator it = usersById.begin();
-             it != usersById.end(); ++it)
-            if (it->second->getRole() == Role::PATIENT)
-                result.push_back(dynamic_cast<Patient*>(it->second));
+        for (const auto& p : usersById)
+            if (p.second->getRole() == Role::PATIENT)
+                result.push_back(dynamic_cast<Patient*>(p.second));
         return result;
     }
 
     void saveDoctor(Doctor* /*d*/) {
-        // Rebuild entire doctors file
         vector<string> lines;
-        for (map<string,Doctor*>::iterator it = doctorsById.begin();
-             it != doctorsById.end(); ++it)
-            lines.push_back(it->second->serialize());
+        for (const auto& p : doctorsById)
+            lines.push_back(p.second->serialize());
         writeLines(DOCS_FILE, lines);
     }
 

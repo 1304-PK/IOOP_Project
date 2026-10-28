@@ -1,17 +1,8 @@
-// ============================================================
-//  main.cpp  –  RESQ Hospital Emergency Dispatch System
-//  Unity-build entry point: includes all other .cpp files.
-//
-//  Build command (Windows + MinGW):
-//    g++ -std=c++17 -O2 -o RESQ main.cpp -o RESQ.exe
-//  Build command (Linux / macOS):
-//    g++ -std=c++17 -O2 -o RESQ main.cpp
-//
-//  NOTE: Compile ONLY main.cpp.  Do NOT compile the other
-//  .cpp files separately — they are included below.
-// ============================================================
+// resq - hospital emergency dispatch and appointment system
+// compile command:
+//   g++ -std=c++11 main.cpp -o resq.exe
 
-// -------- Standard library includes (shared by all files) ---
+// standard library includes
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -34,7 +25,7 @@
 #endif
 using namespace std;
 
-// -------- Unity-build includes (order matters!) -------------
+// importing files
 #include "Graph.cpp"
 #include "FileManager.cpp"
 #include "AuthService.cpp"
@@ -42,18 +33,14 @@ using namespace std;
 #include "EmergencyManager.cpp"
 #include "AppointmentManager.cpp"
 
-// ============================================================
-//  Global application state
-// ============================================================
+// global application state
 static Graph             g_graph;
 static AuthService       g_auth;
 static AmbulanceManager  g_ambMgr;
 static EmergencyManager  g_emgMgr;
 static AppointmentManager g_apptMgr;
 
-// ============================================================
-//  Terminal UI helpers
-// ============================================================
+// terminal ui helpers
 
 static void clearScreen() {
 #ifdef _WIN32
@@ -65,7 +52,6 @@ static void clearScreen() {
 
 static void pressEnter() {
     cout << "\n  Press [Enter] to continue...";
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     cin.get();
 }
 
@@ -127,9 +113,7 @@ static bool confirm(const string& msg) {
     return (!s.empty() && (s[0] == 'y' || s[0] == 'Y'));
 }
 
-// ============================================================
-//  Password input (masked)
-// ============================================================
+// masked password input
 static string getPassword(const string& prompt) {
     cout << "  " << prompt;
     string pw;
@@ -144,7 +128,7 @@ static string getPassword(const string& prompt) {
     }
     cout << "\n";
 #else
-    // POSIX: disable echo
+    // disable echo on posix
     system("stty -echo");
     getline(cin, pw);
     system("stty echo");
@@ -153,9 +137,7 @@ static string getPassword(const string& prompt) {
     return pw;
 }
 
-// ============================================================
-//  Emergency category / severity selection helpers
-// ============================================================
+// category and severity selection helpers
 
 static const vector<string> EMG_CATEGORIES = {
     "Cardiac Arrest", "Stroke", "Trauma", "Fracture",
@@ -185,11 +167,9 @@ static string selectCategory() {
     return EMG_CATEGORIES[c-1];
 }
 
-// ============================================================
-//  Date utilities
-// ============================================================
+// date utilities
 static string todayDate() {
-    time_t t = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    time_t t = time(nullptr);
     struct tm* tmPtr = localtime(&t);
     char buf[12];
     if (tmPtr) strftime(buf, sizeof(buf), "%Y-%m-%d", tmPtr);
@@ -208,9 +188,7 @@ static bool isValidDate(const string& d) {
     } catch(...) { return false; }
 }
 
-// ============================================================
-//  ==================  PATIENT MENU  ========================
-// ============================================================
+// patient menu
 
 static void patientViewProfile(Patient* pat) {
     printSectionHeader("My Profile");
@@ -221,13 +199,13 @@ static void patientViewProfile(Patient* pat) {
 static void patientBookAppointment(Patient* pat) {
     printSectionHeader("Book Appointment");
 
-    // Step 1: Choose specialization
+    // choose specialization
     g_apptMgr.listSpecializations();
     cout << "\n";
     int specIdx = getMenuChoice(1, (int)SPECIALIZATIONS.size());
     string spec = SPECIALIZATIONS[specIdx - 1];
 
-    // Step 2: List doctors
+    // list doctors
     g_apptMgr.listDoctorsForSpec(spec, g_auth);
     auto docs = g_auth.getDoctorsBySpecialization(spec);
     if (docs.empty()) { pressEnter(); return; }
@@ -240,26 +218,26 @@ static void patientBookAppointment(Patient* pat) {
         printError("Invalid doctor ID."); pressEnter(); return;
     }
 
-    // Step 3: Date
+    // date
     cout << "  Enter appointment date (YYYY-MM-DD, today=" << todayDate() << "): ";
     string date = getInput("");
     if (!isValidDate(date)) {
         printError("Invalid date format."); pressEnter(); return;
     }
 
-    // Step 4: Available slots
+    // available slots
     g_apptMgr.listSlots(doc, date);
 
-    // Step 5: Time slot
+    // time slot
     cout << "  Enter time slot (e.g. 09:00): ";
     string time = getInput("");
 
-    // Step 6: Reason
+    // reason
     cout << "  Reason for visit: ";
     string reason = getInput("");
     if (reason.empty()) reason = "General Consultation";
 
-    // Step 7: Confirm
+    // confirm
     cout << "\n  Booking: " << doc->getName() << " | " << date << " | " << time
          << " | " << spec << "\n";
     if (!confirm("Confirm booking?")) { cout << "  Booking cancelled.\n"; pressEnter(); return; }
@@ -302,7 +280,7 @@ static void patientViewAppointments(Patient* pat) {
 static void patientRequestEmergency(Patient* pat) {
     printSectionHeader("Request Emergency");
 
-    // Show/update city
+    // show/update city
     cout << "  Your current city ID: " << pat->getCityId()
          << " (" << g_graph.cityName(pat->getCityId()) << ")\n";
     cout << "\n  Available cities:\n";
@@ -321,7 +299,7 @@ static void patientRequestEmergency(Patient* pat) {
         g_auth.saveAll();
     }
 
-    // Category & severity
+    // category and severity
     string   cat  = selectCategory();
     Severity sev  = selectSeverity();
 
@@ -378,9 +356,7 @@ static void patientMenu(Patient* pat) {
     }
 }
 
-// ============================================================
-//  ==================  DOCTOR MENU  =========================
-// ============================================================
+// doctor menu
 
 static void doctorMenu(Doctor* doc) {
     while (true) {
@@ -440,9 +416,7 @@ static void doctorMenu(Doctor* doc) {
     }
 }
 
-// ============================================================
-//  ==================  ADMIN MENU  ==========================
-// ============================================================
+// admin menu
 
 static void adminViewEmergencyQueue() {
     printSectionHeader("Emergency Priority Queue");
@@ -464,7 +438,7 @@ static void adminDispatchNext() {
     next->display();
     cout << "  " << string(50, '-') << "\n";
 
-    // Show resource availability
+    // show resource availability
     cout << "\n  Ambulances available  : " << g_ambMgr.countAvailable() << "\n";
     int availEPs = 0;
     for (Doctor* ep : g_auth.getEmergencyPhysicians())
@@ -474,7 +448,7 @@ static void adminDispatchNext() {
     if (!confirm("\n  Dispatch this emergency?"))
         return;
 
-    // Pop and dispatch
+    // pop and dispatch
     Emergency* e = g_emgMgr.popNext();
     if (!e) { printError("Queue changed; no eligible emergency."); pressEnter(); return; }
 
@@ -484,9 +458,9 @@ static void adminDispatchNext() {
         cout << "\n";
         e->display();
     } else {
-        // Put it back by re-inserting into queue is handled via pending status
+        // re-inserting into queue is handled via pending status
         printError(err);
-        // Re-mark as pending (it still is, since dispatch failed)
+        // re-mark as pending
     }
     pressEnter();
 }
@@ -669,17 +643,17 @@ static void adminViewEmergencyHistory() {
 
 static void adminViewStats() {
     printSectionHeader("System Statistics");
-    // Patients
+    // patients
     int patients = (int)g_auth.getAllPatients().size();
     int doctors  = (int)g_auth.getAllDoctors().size();
-    // Ambulances
+    // ambulances
     int ambAvail = g_ambMgr.countAvailable();
     int ambBusy  = g_ambMgr.countDispatched();
-    // EPs
+    // eps
     int epAvail = 0, epBusy = 0;
     for (Doctor* ep : g_auth.getEmergencyPhysicians())
         (ep->isAvailable() ? epAvail : epBusy)++;
-    // Emergencies
+    // emergencies
     auto all = g_emgMgr.getAll();
     int emgPending = 0, emgDisp = 0, emgComp = 0;
     for (Emergency* e : all) {
@@ -778,9 +752,7 @@ static void adminMenu() {
     }
 }
 
-// ============================================================
-//  ==================  LOGIN / REGISTER  ====================
-// ============================================================
+// login and registration
 
 static void registerPatient() {
     printSectionHeader("Patient Registration");
@@ -831,9 +803,7 @@ static void loginFlow() {
     }
 }
 
-// ============================================================
-//  ==================  FIRST-RUN SETUP  =====================
-// ============================================================
+// first-run setup
 
 static void firstRunSetup() {
     clearScreen();
@@ -863,9 +833,7 @@ static void firstRunSetup() {
     pressEnter();
 }
 
-// ============================================================
-//  ==================  MAIN MENU  ===========================
-// ============================================================
+// main menu
 
 static void mainMenu() {
     while (true) {
@@ -889,18 +857,16 @@ static void mainMenu() {
     }
 }
 
-// ============================================================
-//  ==================  main()  ==============================
-// ============================================================
+// main
 
 int main() {
-    // Enable ANSI escape codes on Windows 10+
+    // enable ansi escape codes on windows 10+
 #ifdef _WIN32
     system("chcp 65001 > nul");
-    system(""); // Enable ANSI
+    system(""); // enable ansi
 #endif
 
-    // Initialize data directory
+    // initialize data directory
     ensureFile("data/users.txt");
     ensureFile("data/doctors.txt");
     ensureFile("data/ambulances.txt");
@@ -908,34 +874,34 @@ int main() {
     ensureFile("data/appointments.txt");
     ensureFile("data/cities.txt");
 
-    // Load or initialize city graph
+    // load or initialize city graph
     if (!loadCitiesFromFile(g_graph, "data/cities.txt")) {
         g_graph.initSampleNetwork();
         saveCitiesToFile(g_graph, "data/cities.txt");
     }
 
-    // Load users and doctors
+    // load users and doctors
     g_auth.loadAll();
 
-    // First-run: create admin if none exists
+    // first-run: create admin if none exists
     if (!g_auth.adminExists()) {
         firstRunSetup();
     }
 
-    // Seed sample doctors if not present
+    // seed sample doctors if not present
     g_auth.seedSampleDoctors();
 
-    // Load ambulances (initialize fleet on first run)
+    // load ambulances (initialize fleet on first run)
     g_ambMgr.load();
     g_ambMgr.initFleet();
 
-    // Load emergencies (restores pending queue)
+    // load emergencies (restores pending queue)
     g_emgMgr.load();
 
-    // Load appointments (restores doctor slots)
+    // load appointments (restores doctor slots)
     g_apptMgr.load(g_auth);
 
-    // Start main menu
+    // start main menu
     mainMenu();
 
     return 0;

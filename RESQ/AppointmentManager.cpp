@@ -1,11 +1,8 @@
-// ============================================================
-//  AppointmentManager.cpp  –  Appointment booking system
-//  Included by main.cpp (unity build).  Do NOT compile alone.
-// ============================================================
+// appointment booking system
 
 static const string APPT_FILE = "data/appointments.txt";
 
-// ==================== Predefined slots =======================
+// predefined slots
 
 static const vector<string> APPT_TIMES = {
     "09:00", "10:00", "11:00", "14:00", "15:00", "16:00"
@@ -16,7 +13,7 @@ static const vector<string> SPECIALIZATIONS = {
     "Pediatrics", "General Medicine"
 };
 
-// ==================== Appointment status =====================
+// appointment status
 
 enum class ApptStatus {
     PENDING, CONFIRMED, CANCELLED, COMPLETED
@@ -38,7 +35,7 @@ static ApptStatus strToApptStatus(const string& s) {
     return ApptStatus::PENDING;
 }
 
-// ==================== Appointment ============================
+// appointment model
 
 class Appointment {
     string     id;
@@ -54,16 +51,15 @@ class Appointment {
 public:
     Appointment() : status(ApptStatus::PENDING) {}
 
-    Appointment(string id, string patientId, string doctorId,
-                string spec, string date, string time,
-                string reason, string bookedAt)
-        : id(std::move(id)), patientId(std::move(patientId)),
-          doctorId(std::move(doctorId)), specialization(std::move(spec)),
-          date(std::move(date)), timeSlot(std::move(time)),
-          reason(std::move(reason)), status(ApptStatus::CONFIRMED),
-          bookedAt(std::move(bookedAt)) {}
+    Appointment(const string& id, const string& patientId, const string& doctorId,
+                const string& spec, const string& date, const string& time,
+                const string& reason, const string& bookedAt)
+        : id(id), patientId(patientId), doctorId(doctorId),
+          specialization(spec), date(date), timeSlot(time),
+          reason(reason), status(ApptStatus::CONFIRMED),
+          bookedAt(bookedAt) {}
 
-    // Getters
+    // getters
     const string& getId()             const { return id; }
     const string& getPatientId()      const { return patientId; }
     const string& getDoctorId()       const { return doctorId; }
@@ -95,10 +91,10 @@ public:
     }
 };
 
-// ==================== AppointmentManager =====================
+// appointment manager
 
 class AppointmentManager {
-    map<string, Appointment*> appointments;  // id -> Appointment*
+    map<string, Appointment*> appointments;  // id -> appointment
 
 public:
     AppointmentManager() {}
@@ -106,7 +102,7 @@ public:
         for (auto& pair : appointments) delete pair.second;
     }
 
-    // ---- Load from file -------------------------------------
+    // load from file
     void load(AuthService& auth) {
         ensureFile(APPT_FILE);
         appointments.clear();
@@ -119,7 +115,7 @@ public:
             a->setStatus(strToApptStatus(tok[7]));
             appointments[tok[0]] = a;
 
-            // Restore doctor's booked slot (if confirmed/pending)
+            // restore doctor's booked slot (if confirmed or pending)
             if (a->getStatus() == ApptStatus::CONFIRMED ||
                 a->getStatus() == ApptStatus::PENDING) {
                 Doctor* d = auth.getDoctorById(a->getDoctorId());
@@ -129,7 +125,7 @@ public:
         }
     }
 
-    // ---- Save all ------------------------------------------
+    // save all
     void saveAll() const {
         vector<string> lines;
         for (const auto& pair : appointments)
@@ -137,7 +133,7 @@ public:
         writeLines(APPT_FILE, lines);
     }
 
-    // ---- Save single appointment ---------------------------
+    // save single appointment
     void saveOne(Appointment* a) {
         auto lines = readLines(APPT_FILE);
         bool found = false;
@@ -152,7 +148,7 @@ public:
         writeLines(APPT_FILE, lines);
     }
 
-    // ---- List specializations ------------------------------
+    // list specializations
     void listSpecializations() const {
         cout << "\n  Available Specializations:\n";
         cout << string(32, '-') << "\n";
@@ -160,7 +156,7 @@ public:
             cout << "  " << (i+1) << ". " << SPECIALIZATIONS[i] << "\n";
     }
 
-    // ---- List doctors for a specialization -----------------
+    // list doctors for a specialization
     void listDoctorsForSpec(const string& spec, AuthService& auth) const {
         auto docs = auth.getDoctorsBySpecialization(spec);
         if (docs.empty()) {
@@ -178,7 +174,7 @@ public:
                  << "\n";
     }
 
-    // ---- List available slots for a doctor -----------------
+    // list available slots for a doctor
     void listSlots(Doctor* doc, const string& date) const {
         cout << "\n  Available slots for " << doc->getName()
              << " on " << date << ":\n";
@@ -193,12 +189,12 @@ public:
         if (!any) cout << "  All slots are booked for this date.\n";
     }
 
-    // ---- Book appointment -----------------------------------
-    // Returns "" on success, error string on failure
+    // book appointment
+    // returns empty string on success, error string on failure
     string book(const string& patientId, Doctor* doc,
                 const string& date, const string& time,
                 const string& reason) {
-        // Validate slot
+        // validate slot
         bool validTime = false;
         for (auto& t : APPT_TIMES) if (t == time) { validTime = true; break; }
         if (!validTime) return "Invalid time slot.";
@@ -209,7 +205,7 @@ public:
         if (doc->isSlotBooked(date, time))
             return "Slot " + time + " on " + date + " is already booked.";
 
-        // Check patient overlap (same date+time, any doctor)
+        // check patient overlap (same date and time, any doctor)
         for (const auto& pair : appointments) {
             Appointment* a = pair.second;
             if (a->getPatientId() == patientId &&
@@ -229,7 +225,7 @@ public:
         return "";   // success
     }
 
-    // ---- Cancel appointment --------------------------------
+    // cancel appointment
     string cancel(const string& apptId, const string& requesterId,
                   bool isAdmin, AuthService& auth) {
         auto it = appointments.find(apptId);
@@ -253,7 +249,7 @@ public:
         return "";
     }
 
-    // ---- Mark complete (doctor or admin) -------------------
+    // mark complete (doctor or admin)
     string markComplete(const string& apptId, const string& doctorId,
                         bool isAdmin) {
         auto it = appointments.find(apptId);
@@ -269,7 +265,7 @@ public:
         return "";
     }
 
-    // ---- Appointments for a patient ------------------------
+    // appointments for a patient
     vector<Appointment*> getByPatient(const string& patId) const {
         vector<Appointment*> result;
         for (const auto& pair : appointments)
@@ -277,7 +273,7 @@ public:
         return result;
     }
 
-    // ---- Appointments for a doctor -------------------------
+    // appointments for a doctor
     vector<Appointment*> getByDoctor(const string& docId) const {
         vector<Appointment*> result;
         for (const auto& pair : appointments)
@@ -285,14 +281,14 @@ public:
         return result;
     }
 
-    // ---- All appointments ----------------------------------
+    // all appointments
     vector<Appointment*> getAll() const {
         vector<Appointment*> result;
         for (const auto& pair : appointments) result.push_back(pair.second);
         return result;
     }
 
-    // ---- Display a list of appointments --------------------
+    // display a list of appointments
     static void displayList(const vector<Appointment*>& list,
                             AuthService& auth,
                             const string& header = "") {
@@ -324,7 +320,7 @@ public:
         }
     }
 
-    // ---- Display statistics --------------------------------
+    // display statistics
     void displayStats() const {
         int total = 0, confirmed = 0, cancelled = 0, completed = 0;
         for (const auto& pair : appointments) {

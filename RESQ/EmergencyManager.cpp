@@ -1,11 +1,8 @@
-// ============================================================
-//  EmergencyManager.cpp  –  Emergency priority queue + dispatch
-//  Included by main.cpp (unity build).  Do NOT compile alone.
-// ============================================================
+// emergency priority queue and dispatch
 
 static const string EMG_FILE = "data/emergencies.txt";
 
-// ==================== Emergency status =======================
+// emergency status
 
 enum class EmergencyStatus {
     PENDING, DISPATCHED, COMPLETED, CANCELLED
@@ -27,7 +24,7 @@ static EmergencyStatus strToEmgStatus(const string& s) {
     return EmergencyStatus::PENDING;
 }
 
-// ==================== Severity ===============================
+// severity
 
 enum class Severity { CRITICAL = 1, HIGH = 2, MODERATE = 3, LOW = 4 };
 
@@ -56,7 +53,7 @@ static string severityColor(Severity s) {
     return "\033[0m";
 }
 
-// ==================== Emergency ==============================
+// emergency model
 
 class Emergency {
     string          id;
@@ -81,16 +78,15 @@ public:
                   epochTime(0), seqNum(0), status(EmergencyStatus::PENDING),
                   distanceKm(0) {}
 
-    Emergency(string id, string patientId, int cityId,
-              string category, Severity severity,
-              string timestamp, long long epoch, long long seq)
-        : id(std::move(id)), patientId(std::move(patientId)),
-          cityId(cityId), category(std::move(category)),
-          severity(severity), requestTimestamp(std::move(timestamp)),
-          epochTime(epoch), seqNum(seq),
+    Emergency(const string& id, const string& patientId, int cityId,
+              const string& category, Severity severity,
+              const string& timestamp, long long epoch, long long seq)
+        : id(id), patientId(patientId), cityId(cityId),
+          category(category), severity(severity),
+          requestTimestamp(timestamp), epochTime(epoch), seqNum(seq),
           status(EmergencyStatus::PENDING), distanceKm(0) {}
 
-    // Getters
+    // getters
     const string& getId()           const { return id; }
     const string& getPatientId()    const { return patientId; }
     int           getCityId()       const { return cityId; }
@@ -108,7 +104,7 @@ public:
     const string& getRetRoute()     const { return returnRoute; }
     int           getDistKm()       const { return distanceKm; }
 
-    // Setters
+    // setters
     void setStatus(EmergencyStatus s)    { status = s; }
     void setAmbulance(const string& id)  { assignedAmbId = id; }
     void setPhysicians(const string& p1, const string& p2) {
@@ -120,26 +116,24 @@ public:
     void setCompletedAt(const string& ts) { completedAt = ts; }
     const string& getCompletedAt() const  { return completedAt; }
 
-    // ---- Serialize -----------------------------------------
-    // id|patId|cityId|category|severity|timestamp|epoch|seq|
-    //   ambId|phy1Id|phy2Id|status|outRoute|retRoute|distKm|completedAt
+    // serialize
     string serialize() const {
-        auto orNull = [](const string& s) { return s.empty() ? "NONE" : s; };
+        auto val = [](const string& s) { return s.empty() ? "NONE" : s; };
         return id + DELIM + patientId + DELIM + to_string(cityId) + DELIM +
                category + DELIM + severityToStr(severity) + DELIM +
                requestTimestamp + DELIM + to_string(epochTime) + DELIM +
                to_string(seqNum) + DELIM +
-               orNull(assignedAmbId) + DELIM +
-               orNull(physician1Id) + DELIM +
-               orNull(physician2Id) + DELIM +
+               val(assignedAmbId) + DELIM +
+               val(physician1Id) + DELIM +
+               val(physician2Id) + DELIM +
                emgStatusToStr(status) + DELIM +
-               orNull(outboundRoute) + DELIM +
-               orNull(returnRoute) + DELIM +
+               val(outboundRoute) + DELIM +
+               val(returnRoute) + DELIM +
                to_string(distanceKm) + DELIM +
-               orNull(completedAt);
+               val(completedAt);
     }
 
-    // ---- Display summary ------------------------------------
+    // display summary
     void display(bool colorize = true) const {
         string col  = colorize ? severityColor(severity) : "";
         string rst  = colorize ? "\033[0m" : "";
@@ -162,30 +156,29 @@ public:
     }
 };
 
-// ==================== Priority Queue Comparator ==============
+// priority queue comparator
+
+static bool compareEmergencyPriority(const Emergency* a, const Emergency* b) {
+    if (a->getSeverityVal() != b->getSeverityVal())
+        return a->getSeverityVal() < b->getSeverityVal();
+    if (a->getEpoch() != b->getEpoch())
+        return a->getEpoch() < b->getEpoch();
+    return a->getSeqNum() < b->getSeqNum();
+}
 
 struct EmergencyComparator {
-    // Returns true if a has LOWER priority than b
-    // (std::priority_queue pops highest priority = top element)
     bool operator()(const Emergency* a, const Emergency* b) const {
-        // Lower severity value = higher priority
-        if (a->getSeverityVal() != b->getSeverityVal())
-            return a->getSeverityVal() > b->getSeverityVal();
-        // Equal severity: earlier request = higher priority
-        if (a->getEpoch() != b->getEpoch())
-            return a->getEpoch() > b->getEpoch();
-        // Equal timestamp: lower sequence = earlier = higher priority
-        return a->getSeqNum() > b->getSeqNum();
+        return compareEmergencyPriority(b, a);
     }
 };
 
-// ==================== EmergencyManager =======================
+// emergency manager
 
 class EmergencyManager {
-    // All emergencies loaded from file (owned)
+    // all emergencies loaded from file
     map<string, Emergency*> allEmergencies;
 
-    // In-memory pending priority queue (pointers into allEmergencies)
+    // pending priority queue
     priority_queue<Emergency*, vector<Emergency*>, EmergencyComparator> pendingQueue;
 
     long long nextSeq = 1;
@@ -196,11 +189,11 @@ public:
         for (auto& pair : allEmergencies) delete pair.second;
     }
 
-    // ---- Load from file -------------------------------------
+    // load from file
     void load() {
         ensureFile(EMG_FILE);
         allEmergencies.clear();
-        // Clear queue
+        // clear queue
         pendingQueue = priority_queue<Emergency*, vector<Emergency*>, EmergencyComparator>();
 
         for (auto& line : readLines(EMG_FILE)) {
@@ -208,7 +201,7 @@ public:
             if (tok.size() < 16) continue;
 
             Emergency* e = new Emergency();
-            // Parse
+            // parse
             string eid = tok[0];
             long long epoch = 0, seq = 0;
             int cityId = 0, distKm = 0;
@@ -222,26 +215,28 @@ public:
             *e = Emergency(tok[0], tok[1], cityId, tok[3],
                            strToSeverity(tok[4]), tok[5], epoch, seq);
 
-            auto noneOrEmpty = [](const string& s) { return s == "NONE" ? "" : s; };
+            string ambId = (tok[8] == "NONE") ? "" : tok[8];
+            string p1Id  = (tok[9] == "NONE") ? "" : tok[9];
+            string p2Id  = (tok[10] == "NONE") ? "" : tok[10];
+            string outR  = (tok[12] == "NONE") ? "" : tok[12];
+            string retR  = (tok[13] == "NONE") ? "" : tok[13];
 
-            e->setAmbulance(noneOrEmpty(tok[8]));
-            e->setPhysicians(noneOrEmpty(tok[9]), noneOrEmpty(tok[10]));
+            e->setAmbulance(ambId);
+            e->setPhysicians(p1Id, p2Id);
             e->setStatus(strToEmgStatus(tok[11]));
-            string outR = noneOrEmpty(tok[12]);
-            string retR = noneOrEmpty(tok[13]);
             e->setRoutes(outR, retR, distKm);
-            if (tok.size() > 15) e->setCompletedAt(noneOrEmpty(tok[15]));
+            if (tok.size() > 15 && tok[15] != "NONE") e->setCompletedAt(tok[15]);
 
             allEmergencies[eid] = e;
             if (seq >= nextSeq) nextSeq = seq + 1;
 
-            // Re-enqueue pending emergencies
+            // re-enqueue pending emergencies
             if (e->getStatus() == EmergencyStatus::PENDING)
                 pendingQueue.push(e);
         }
     }
 
-    // ---- Save all ------------------------------------------
+    // save all
     void saveAll() const {
         vector<string> lines;
         for (const auto& pair : allEmergencies)
@@ -249,9 +244,9 @@ public:
         writeLines(EMG_FILE, lines);
     }
 
-    // ---- Save single emergency (update in file) ------------
+    // save single emergency
     void saveOne(Emergency* e) {
-        // Replace the line for this emergency in the file
+        // replace the line for this emergency in the file
         auto lines = readLines(EMG_FILE);
         bool found = false;
         for (auto& line : lines) {
@@ -265,7 +260,7 @@ public:
         writeLines(EMG_FILE, lines);
     }
 
-    // ---- Submit a new emergency -----------------------------
+    // submit a new emergency
     Emergency* submit(const string& patientId, int cityId,
                       const string& category, Severity severity) {
         string id = genId("EMG", EMG_FILE);
@@ -279,9 +274,9 @@ public:
         return e;
     }
 
-    // ---- Peek highest-priority pending ---------------------
+    // peek highest-priority pending
     Emergency* peekNext() {
-        // Pop stale entries (those no longer PENDING)
+        // pop stale entries
         while (!pendingQueue.empty()) {
             Emergency* top = pendingQueue.top();
             if (top->getStatus() == EmergencyStatus::PENDING) return top;
@@ -290,7 +285,7 @@ public:
         return nullptr;
     }
 
-    // ---- Pop highest-priority pending ----------------------
+    // pop highest-priority pending
     Emergency* popNext() {
         while (!pendingQueue.empty()) {
             Emergency* top = pendingQueue.top();
@@ -300,8 +295,8 @@ public:
         return nullptr;
     }
 
-    // ---- Dispatch an emergency ------------------------------
-    // Returns error string or "" on success
+    // dispatch an emergency
+    // returns error string or empty string on success
     string dispatch(Emergency* e,
                     AmbulanceManager& ambMgr,
                     AuthService& auth,
@@ -309,12 +304,12 @@ public:
         if (!e || e->getStatus() != EmergencyStatus::PENDING)
             return "Emergency is not in PENDING state.";
 
-        // Check ambulance availability
+        // check ambulance availability
         Ambulance* amb = ambMgr.getAvailable();
         if (!amb)
             return "No ambulances available. Emergency remains pending.";
 
-        // Check emergency physician availability (need 2)
+        // check emergency physician availability (need 2)
         auto eps = auth.getEmergencyPhysicians();
         vector<Doctor*> availEPs;
         for (Doctor* ep : eps)
@@ -324,7 +319,7 @@ public:
             return "All emergency physicians are occupied. "
                    "New emergency requests remain pending.";
 
-        // Check route
+        // check route
         if (!graph.cityExists(e->getCityId()))
             return "Patient city (ID " + to_string(e->getCityId()) +
                    ") not found in road network.";
@@ -337,24 +332,23 @@ public:
         vector<int> retPath = graph.shortestPath(e->getCityId(), HOSPITAL_CITY_ID);
         int dist = graph.shortestDist(HOSPITAL_CITY_ID, e->getCityId());
 
-        // ----- ATOMIC ALLOCATION -----
-        // Reserve two EPs
+        // reserve two eps
         Doctor* ep1 = availEPs[0];
         Doctor* ep2 = availEPs[1];
         ep1->setAvailable(false);  ep1->setAssignedEmergency(e->getId());
         ep2->setAvailable(false);  ep2->setAssignedEmergency(e->getId());
 
-        // Dispatch ambulance
+        // dispatch ambulance
         ambMgr.dispatch(amb->getId(), e->getId(), e->getCityId());
 
-        // Update emergency
+        // update emergency
         e->setAmbulance(amb->getId());
         e->setPhysicians(ep1->getId(), ep2->getId());
         e->setRoutes(graph.formatPath(outPath),
                      graph.formatPath(retPath), dist);
         e->setStatus(EmergencyStatus::DISPATCHED);
 
-        // Persist
+        // persist
         auth.saveDoctor(ep1);
         auth.saveDoctor(ep2);
         saveOne(e);
@@ -362,7 +356,7 @@ public:
         return "";   // success
     }
 
-    // ---- Complete an active emergency ----------------------
+    // complete an active emergency
     string complete(const string& emergId,
                     AmbulanceManager& ambMgr,
                     AuthService& auth) {
@@ -374,10 +368,10 @@ public:
         if (e->getStatus() != EmergencyStatus::DISPATCHED)
             return "Emergency '" + emergId + "' is not currently DISPATCHED.";
 
-        // Release ambulance
+        // release ambulance
         if (!e->getAmbId().empty()) ambMgr.completeMission(e->getAmbId());
 
-        // Release physicians
+        // release physicians
         auto releaseEP = [&](const string& epId) {
             Doctor* ep = auth.getDoctorById(epId);
             if (ep) { ep->clearAssignment(); auth.saveDoctor(ep); }
@@ -391,13 +385,13 @@ public:
         return "";
     }
 
-    // ---- Lookups -------------------------------------------
+    // lookups
     Emergency* getById(const string& id) {
         auto it = allEmergencies.find(id);
         return (it != allEmergencies.end()) ? it->second : nullptr;
     }
 
-    // ---- All emergencies for a patient ---------------------
+    // all emergencies for a patient
     vector<Emergency*> getByPatient(const string& patientId) const {
         vector<Emergency*> result;
         for (const auto& pair : allEmergencies)
@@ -406,7 +400,7 @@ public:
         return result;
     }
 
-    // ---- All emergencies ------------------------------------
+    // all emergencies
     vector<Emergency*> getAll() const {
         vector<Emergency*> result;
         for (const auto& pair : allEmergencies)
@@ -414,20 +408,13 @@ public:
         return result;
     }
 
-    // ---- Pending queue snapshot (sorted) -------------------
+    // pending queue snapshot (sorted)
     vector<Emergency*> getPendingSnapshot() {
-        // Collect pending, sort by priority
         vector<Emergency*> pending;
         for (const auto& pair : allEmergencies)
             if (pair.second->getStatus() == EmergencyStatus::PENDING)
                 pending.push_back(pair.second);
-        sort(pending.begin(), pending.end(), [](Emergency* a, Emergency* b) {
-            if (a->getSeverityVal() != b->getSeverityVal())
-                return a->getSeverityVal() < b->getSeverityVal();
-            if (a->getEpoch() != b->getEpoch())
-                return a->getEpoch() < b->getEpoch();
-            return a->getSeqNum() < b->getSeqNum();
-        });
+        sort(pending.begin(), pending.end(), compareEmergencyPriority);
         return pending;
     }
 
@@ -435,7 +422,7 @@ public:
         return (int)getPendingSnapshot().size();
     }
 
-    // ---- Display priority queue ----------------------------
+    // display priority queue
     void displayPendingQueue(const Graph& g) {
         auto pending = getPendingSnapshot();
         if (pending.empty()) {
@@ -468,7 +455,7 @@ public:
         }
     }
 
-    // ---- Display all emergencies ---------------------------
+    // display all emergencies
     void displayAll(const Graph& g) {
         auto all = getAll();
         if (all.empty()) {
@@ -496,7 +483,7 @@ public:
         }
     }
 
-    // ---- Display dispatched emergencies --------------------
+    // display dispatched emergencies
     void displayDispatched() {
         bool any = false;
         for (const auto& pair : allEmergencies) {
@@ -508,7 +495,7 @@ public:
         if (!any) cout << "  No active (dispatched) emergencies.\n";
     }
 
-    // ---- Display EPs status ---------------------------------
+    // display ep status
     void displayEPStatus(AuthService& auth) {
         auto eps = auth.getEmergencyPhysicians();
         cout << "\n";
