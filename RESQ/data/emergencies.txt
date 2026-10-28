@@ -1,1 +1,4 @@
-EMG001|PAT001|9|Cardiac Arrest|CRITICAL|2026-10-27 23:50:34|1793125234|1|NONE|NONE|NONE|PENDING|NONE|NONE|0|NONE
+EMG001|PAT001|9|Cardiac Arrest|CRITICAL|2026-10-27 23:50:34|1793125234|1|AMB001|DOC011|DOC012|COMPLETED|Central Hospital City -> Southgate -> Pinecrest|Pinecrest -> Southgate -> Central Hospital City|32|2026-10-28 09:45:01
+EMG002|PAT001|9|Cardiac Arrest|HIGH|2026-10-28 09:43:59|1793160839|2|AMB001|DOC011|DOC012|COMPLETED|Central Hospital City -> Southgate -> Pinecrest|Pinecrest -> Southgate -> Central Hospital City|32|2026-10-28 09:45:12
+EMG003|PAT001|9|Trauma|CRITICAL|2026-10-28 09:44:09|1793160849|3|AMB001|DOC011|DOC012|COMPLETED|Central Hospital City -> Southgate -> Pinecrest|Pinecrest -> Southgate -> Central Hospital City|32|2026-10-28 09:45:07
+EMG004|PAT001|9|Cardiac Arrest|CRITICAL|2026-10-28 09:45:25|1793160925|4|AMB001|DOC011|DOC012|COMPLETED|Central Hospital City -> Southgate -> Pinecrest|Pinecrest -> Southgate -> Central Hospital City|32|2026-10-28 09:45:53
